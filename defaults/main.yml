@@ -1,2 +1,3 @@
 ---
 # defaults file for cvstebut.kind-dockernetwork
+cvstebut_docker_forwarding: true

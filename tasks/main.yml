@@ -1,2 +1,64 @@
 ---
 # tasks file for cvstebut.kind-dockernetwork
+- name: "Read docker daemon fragment from defaults folder into cvstebut_docker_daemon_data"
+  include_vars:
+    file: defaults/docker_daemon.json
+    name: cvstebut_docker_daemon_data
+
+#- debug:
+#    msg: "cvstebut_docker_daemon_data: {{ cvstebut_docker_daemon_data }}"
+
+- name: Ensures /etc/docker dir exists
+  file: path=/etc/docker state=directory
+
+- name: check for existence of /etc/docker/daemon.json
+  stat:
+    path: /etc/docker/daemon.json
+  register: docker_daemon_file
+
+- name: "Read data and merge default-address-pools if /etc/docker/daemon.json exists"
+  block:
+  - name: Read docker daemon.json into variable, if it exists
+    slurp:
+      path: /etc/docker/daemon.json
+    register: dockerdaemonfile
+    when: docker_daemon_file.stat.exists == true
+
+  - set_fact:
+      imported_docker_daemon_data : "{{ dockerdaemonfile.content | b64decode | from_json }}"
+  
+  when: docker_daemon_file.stat.exists == true 
+
+- name: Merge data from cvstebut_docker_daemon_data role variable
+  set_fact:
+    docker_daemon_data: "{{ imported_docker_daemon_data | default([]) | combine(cvstebut_docker_daemon_data) }}"
+
+- name: Write merged docker daemon data to /etc/docker/daemon.json
+  copy: 
+    content: "{{ docker_daemon_data | to_nice_json }}" 
+    dest: /etc/docker/daemon.json
+
+- name: check for existence of /etc/sysctl.d
+  stat:
+    path: /etc/sysctl.d/
+  register: etc_sysctl_d_folder
+- name: Configure ip forwarding
+  block:
+
+  - name: "Add net.ipv4.ip_forward=1 to /etc/sysctl.d/docker_forwarding.conf"
+    lineinfile:
+      path: /etc/sysctl.d/docker_forwarding.conf
+      state: present
+      regexp: '^net\.ipv4\.ip_forward=1'
+      line: net.ipv4.ip_forward=1
+      create: yes
+
+  - name: "Restart networking service"
+    service:
+      name: network
+      state: restarted
+
+  when: 
+    - cvstebut_docker_forwarding == true 
+    - etc_sysctl_d_folder.stat.exists == true
+  

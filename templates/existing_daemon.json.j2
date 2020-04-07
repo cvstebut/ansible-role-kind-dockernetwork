@@ -1,0 +1,14 @@
+{
+        "default-address-pools": [
+                {
+                        "base": "10.3.2.0/24",
+                        "size": 32
+                }
+        ],
+        "storage-driver": "devicemapper",
+        "storage-opts": [
+                "dm.thinpooldev=/dev/mapper/thin-pool",
+                "dm.use_deferred_deletion=true",
+                "dm.use_deferred_removal=true"
+        ]
+}
